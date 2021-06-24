@@ -49,9 +49,9 @@ def check_classes(array):
 
 if __name__ == "__main__":
         
-    label_folder_path = r"C:\Users\jasper\Documents\HTCV\MrsAdam\HTCV\Label_Maps"
+    label_folder_path = r"C:\Users\jasper\Documents\HTCV_local\Label_Maps"
 
-    ground_truth = cv2.imread(r"C:\Users\jasper\Documents\HTCV\MrsAdam\HTCV\2018IEEE_Contest\Phase2\TrainingGT\2018_IEEE_GRSS_DFC_GT_TR.tif",0)
+    ground_truth = cv2.imread(r"C:\Users\jasper\Documents\HTCV_local\2018IEEE_Contest\Phase2\TrainingGT\2018_IEEE_GRSS_DFC_GT_TR.tif",0)
     
 
 
@@ -71,7 +71,7 @@ if __name__ == "__main__":
         
         out_img = Image.fromarray(label_image.astype(np.uint8))
     """
-    for _ in range(130,len(rgb_images)):
+    for _ in range(len(rgb_images)):
         label_map = rgb_images[_]
         #test_img = rgb_prediction_to_classification(test_img)
         map_training_region = label_map[601:1202,596:2980]
@@ -88,5 +88,5 @@ if __name__ == "__main__":
         print(performance_dict[flat_label_image_paths[_]])
     
     
-    out_file = open("performance.json", "w+") 
-    json.dump(performance_dict, out_file) 
+    with open(r"C:\Users\jasper\Documents\HTCV\LOFBDRF\performance.json", "w+") as out_file:
+        json.dump(performance_dict, out_file) 
