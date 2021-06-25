@@ -22,7 +22,7 @@ def RF_assign_dist(RF):
     #and assigns the distances attribute to all trees 
     #st tree.distances is a dictionary with tree.distances[b_tree] gives the distance to b_tree
     print("Calculating distances...")
-    assert hasattr(RF.estimators_[25],"prediction"), "Random Tree has not been trained yet or the random Trees have not yet been assigned a prediction attribute."
+    assert hasattr(RF.estimators_[0],"prediction"), "Random Tree has not been trained yet or the random Trees have not yet been assigned a prediction attribute."
     for a_tree in RF.estimators_:
         a_tree.distances = {b_tree: np.linalg.norm(a_tree.prediction - b_tree.prediction) for b_tree in RF.estimators_}
     
@@ -94,7 +94,7 @@ def LOFs_from_treesPredictions(treesPredictions,k):
 def sigmoid(x):
     return (1 / (1 + np.exp(-x)))
 
-def normalize_LOFs(LOF_dict):
+def normalize_LOF_dict(LOF_dict):
     #normalizes all the values in the LOF dict
     #st that they represent the probablility of each tree beeing an outlier
     #the paper is referencing a source but does not specify the method of normalization
@@ -103,20 +103,23 @@ def normalize_LOFs(LOF_dict):
     
     return {tree: sigmoid(LOF) for tree,LOF in LOF_dict.items()} #for the time beeing ill just use a regular sigmoidal function
 
-def tree_weight(tree,tree_LOF,x_test,y_test):
+def tree_weight(tree,tree_LOF):
     #calculates the weight of the tree according to the paper
     #why they had to call it "weight" is beyond me
-    if y_test==None:
-        
+    if tree.score_attr==None:
         return tree_LOF
-    return tree.score(x_test,y_test) * tree_LOF
+    return tree.score_attr * tree_LOF
+    
 
-def weights_from_LOFs(normalized_LOFs,x_test,y_test):
+def calculate_score(tree,x_test,y_test):
+    tree.score_attr=tree.score(x_test,y_test)
+
+def LOFs_and_score_to_weights(normalized_LOF_dict):
     #assigns a weight to each tree in the ensemble
     #and returns it as a dictionary
     #input(f"y_test is {y_test}")
-    assert max(normalized_LOFs.values()), "Local Outlier Factors not normalized"
-    weights = {tree:tree_weight(tree,LOF,x_test,y_test) for tree,LOF in normalized_LOFs.items() }
+    assert max(normalized_LOF_dict.values()), "Local Outlier Factors not normalized"
+    weights = {tree:tree_weight(tree,LOF) for tree,LOF in normalized_LOF_dict.items() }
     return weights
 
 #@cache 
@@ -133,8 +136,8 @@ def assemble_LOFs(RF,k,x_test,y_test):
 
 def assemble_weigths(LOFs,x_test,y_test):
     print("assembling weights...")
-    normalized_LOFs = normalize_LOFs(LOFs)
-    weights = weights_from_LOFs(normalized_LOFs,x_test,y_test)
+    normalized_LOF_dict = normalize_LOF_dict(LOFs)
+    weights = weights_from_LOFs(normalized_LOF_dict,x_test,y_test)
     return weights
 
 def RF_accuracies(RF,x_test,y_test):
@@ -172,6 +175,8 @@ if __name__ == "__main__":
     print(f"{avg_tree_acc} average accuracy over all trees")
     print(f"{ensemble_acc} ensemble accuracy")
 
+    for tree in RF:
+        calculate_score(tree,x_test,y_test)
 
     for k in [5,10,15,20,25]:
 
