@@ -35,11 +35,11 @@ def rgb_prediction_to_classification(rgb_prediction):
         
 def perfomance(label_map,ground_truth):
     assert label_map.shape==ground_truth.shape, f"shapes not matching in performance calculation: \nlabel_map{label_map.shape} \nground_truth{ground_truth.shape}"
-    overall_pxl = len(label_map)*len(label_map[0])
+    overall_pxl = np.count_nonzero(label_map)
     correct_guesses = 0
     for column in range(label_map.shape[0]):
         for pxl in range(label_map.shape[1]):
-            if label_map[column][pxl] == ground_truth[column][pxl]:
+            if label_map[column][pxl] == ground_truth[column][pxl] and ground_truth[column][pxl]!=0:
                 correct_guesses += 1
     return correct_guesses/overall_pxl
                 
@@ -88,5 +88,5 @@ if __name__ == "__main__":
         print(performance_dict[flat_label_image_paths[_]])
     
     
-    with open(r"C:\Users\jasper\Documents\HTCV\LOFBDRF\performance.json", "w+") as out_file:
+    with open(r"C:\Users\jasper\Documents\HTCV\LOFBDRF\performance_cleaned.json", "w+") as out_file:
         json.dump(performance_dict, out_file) 

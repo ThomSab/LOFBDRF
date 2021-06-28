@@ -102,7 +102,7 @@ if __name__ == "__main__":
     
     tree_predictions_dict = {tree:tree.prediction for tree in mockforest.estimators_}
 
-    k = 20
+    k = 50
     
     lof.RF_assign_dist(mockforest)
     lof.RF_assign_k_dist(mockforest,k)
