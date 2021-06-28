@@ -33,26 +33,47 @@ def rgb_prediction_to_classification(rgb_prediction):
         return np.array([color_dict[tuple(rgb_value)] for rgb_prediction_column in rgb_prediction for rgb_value in rgb_prediction_column]).reshape(rgb_prediction.shape[0],rgb_prediction.shape[1])
     return np.array([color_dict[tuple(rgb_value)] for rgb_value in rgb_prediction]) 
         
-def perfomance(label_map,ground_truth):
+def perfomance(label_map,ground_truth,trainingSample):
     assert label_map.shape==ground_truth.shape, f"shapes not matching in performance calculation: \nlabel_map{label_map.shape} \nground_truth{ground_truth.shape}"
-    overall_pxl = np.count_nonzero(label_map)
+    overall_pxl = np.count_nonzero(ground_truth)
     correct_guesses = 0
     for column in range(label_map.shape[0]):
         for pxl in range(label_map.shape[1]):
-            if label_map[column][pxl] == ground_truth[column][pxl] and ground_truth[column][pxl]!=0:
-                correct_guesses += 1
-    return correct_guesses/overall_pxl
+            if label_map[column][pxl] == ground_truth[column][pxl] and is_nonzero(column,pxl,ground_truth):
+                if not is_training_sample(column,pxl,trainingSample):
+                    correct_guesses += 1
+                else:
+                    overall_pxl-=1
                 
+    return correct_guesses/overall_pxl
+
+def is_nonzero(x,y,ground_truth):
+    return ground_truth[x][y]!=0
+
+def is_training_sample(x,y,trainingSample):
+    return trainingSample[x][y]==76#the greyscale value for the training pixels color ie red
+
 def check_classes(array):
     class_set = set([ _ for col in array for _ in col])
     return list(class_set)
+
+def cut_training_region_from_lm(label_map):
+    assert (label_map.shape[0]==1202 and label_map.shape[1]==4172), "label_map is crooked from the start"
+    map_training_region = label_map[601:1202,596:2980]
+    image_to_rescale = Image.fromarray(map_training_region.astype(np.uint8))
+    image_rescaled = image_to_rescale.resize((4768,1202),Image.NEAREST)
+    return image_rescaled
+
+    
+    return training_region
 
 if __name__ == "__main__":
         
     label_folder_path = r"C:\Users\jasper\Documents\HTCV_local\Label_Maps"
 
     ground_truth = cv2.imread(r"C:\Users\jasper\Documents\HTCV_local\2018IEEE_Contest\Phase2\TrainingGT\2018_IEEE_GRSS_DFC_GT_TR.tif",0)
-    
+    trainSamples = cv2.imread(r"C:\Users\jasper\Documents\HTCV_local\trainSamples.png",0)
+    trainSamples_relevant = np.array(cut_training_region_from_lm(trainSamples))    
 
 
     label_image_paths = [
@@ -74,19 +95,16 @@ if __name__ == "__main__":
     for _ in range(len(rgb_images)):
         label_map = rgb_images[_]
         #test_img = rgb_prediction_to_classification(test_img)
-        map_training_region = label_map[601:1202,596:2980]
-        image_to_rescale = Image.fromarray(map_training_region.astype(np.uint8))
-        image_rescaled = image_to_rescale.resize((4768,1202),Image.NEAREST)
-        img_training_region = np.array(image_rescaled)
+        img_training_region = np.array(cut_training_region_from_lm(label_map))
         img_training_region = rgb_prediction_to_classification(img_training_region)
         
         
         
-        performance_dict[flat_label_image_paths[_]] = str(perfomance(img_training_region,ground_truth))
+        performance_dict[flat_label_image_paths[_]] = str(perfomance(img_training_region,ground_truth,trainSamples_relevant))
         print(flat_label_image_paths[_])
         print(check_classes(img_training_region))
         print(performance_dict[flat_label_image_paths[_]])
     
     
-    with open(r"C:\Users\jasper\Documents\HTCV\LOFBDRF\performance_cleaned.json", "w+") as out_file:
+    with open(r"C:\Users\jasper\Documents\HTCV\LOFBDRF\performance_nonzeros_nontraining.json", "w+") as out_file:
         json.dump(performance_dict, out_file) 
