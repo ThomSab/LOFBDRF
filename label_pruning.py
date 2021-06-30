@@ -4,6 +4,7 @@ import pandas as pd
 import os
 from PIL import Image
 import json
+import random
 
 import LOFB_DRF as lof
 
@@ -40,10 +41,15 @@ class MockTree:
     def __init__(self,name):
         self.name = name
         self.prediction = None
+        self.prediction_sample = None
 
 def mock_create_rgb_treesPredictions(RF,rgb_prediction_vectors):
     for idx,a_tree in enumerate(RF.estimators_):
         a_tree.prediction = rgb_prediction_vectors[idx] 
+
+def mock_create_prediction_samples(RF,prediction_samples):
+    for idx,a_tree in enumerate(RF.estimators_):
+        a_tree.prediction_sample = prediction_samples[idx] 
 
 def rgb_prediction_to_classification(rgb_prediction):
     rgb_prediction_tuples = list(map(tuple,rgb_prediction))
@@ -53,17 +59,35 @@ def mock_create_classifications(RF):
     for idx,a_tree in enumerate(RF.estimators_):
         print(f"Creating classification of tree {a_tree.name}")
         a_tree.prediction = rgb_prediction_to_classification(a_tree.prediction)
+
+def mock_create_sample_classifications(RF):
+    for idx,a_tree in enumerate(RF.estimators_):
+        print(f"Creating classification of tree {a_tree.name}")
+        a_tree.prediction_sample = rgb_prediction_to_classification(a_tree.prediction_sample)
+
         
 def mock_majority_vote(mockforest):
     print("Voting...")
     ensemble_array=np.array([estimator.prediction for estimator in mockforest.estimators_])
     return np.array([majority_classification(pixel) for pixel in ensemble_array.T])
+    
+def extract_sample_from_vector(vector,sample_idx_list=None):
+    if sample_idx_list is None:
+        return vector
+    else:
+        return np.array([vector[_] for _ in sample_idx_list])
+        
 
 def majority_classification(vector):
     return np.bincount(vector).argmax()
 
 if __name__ == "__main__":
         
+    k = 5
+    sample_size = 100
+    sample_idx_list=None
+    
+    
     label_folder_path = r"C:\Users\jasper\Documents\HTCV_local\Label_Maps"
     
     with open(r"C:\Users\jasper\Documents\HTCV\LOFBDRF\performance.json") as score_file:
@@ -81,12 +105,16 @@ if __name__ == "__main__":
     rgb_image_dict = {image : cv2.imread(image) for image in image_names}
     rgb_vector_images = [img.reshape(-1,3) for img in rgb_image_dict.values()]
 
+    sample_idx_list = np.random.choice(range(len(rgb_vector_images)),sample_size,replace=False)
+    rgb_vector_image_samples = [extract_sample_from_vector(vector_image,sample_idx_list) for vector_image in rgb_vector_images]
 
 
     
     mockforest=MockForest(image_names)
     #mock_create_grey_treesPredictions(mockforest,grey_vector_images)
+    mock_create_prediction_samples(mockforest,rgb_vector_image_samples)
     mock_create_rgb_treesPredictions(mockforest,rgb_vector_images)
+
     del rgb_image_dict
     del rgb_vector_images
     
@@ -94,7 +122,7 @@ if __name__ == "__main__":
         tree.score_attr = np.float(score_dict[tree.name])
 
     mockforest.estimators_.sort(key= lambda x:x.score_attr,reverse=True)
-    mock_create_classifications(mockforest)
+    mock_create_sample_classifications(mockforest)
     #for tree in mockforest.estimators_:
     #    tree.prediction = tree.classification
 
@@ -102,7 +130,7 @@ if __name__ == "__main__":
     
     tree_predictions_dict = {tree:tree.prediction for tree in mockforest.estimators_}
 
-    k = 50
+    
     
     lof.RF_assign_dist(mockforest)
     lof.RF_assign_k_dist(mockforest,k)
@@ -115,6 +143,7 @@ if __name__ == "__main__":
     mockforest.estimators_ = [tree for tree,weight in sorted(weights.items(), key=lambda item:item[1], reverse=True)][:k]
 
     print("Forest pruned")
+    mock_create_classifications(mockforest)
 
     majority_vote= mock_majority_vote(mockforest)
     

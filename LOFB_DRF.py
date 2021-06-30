@@ -24,7 +24,7 @@ def RF_assign_dist(RF):
     print("Calculating distances...")
     assert hasattr(RF.estimators_[0],"prediction"), "Random Tree has not been trained yet or the random Trees have not yet been assigned a prediction attribute."
     for a_tree in RF.estimators_:
-        a_tree.distances = {b_tree: np.linalg.norm(a_tree.prediction - b_tree.prediction) for b_tree in RF.estimators_}
+        a_tree.distances = {b_tree: np.linalg.norm(a_tree.prediction_sample - b_tree.prediction_sample) for b_tree in RF.estimators_}
     
 def k_dist(a_tree,k):
     #the k-distance of a, in this case a is the prediction made by a random tree over the test data
@@ -45,7 +45,7 @@ def rd_k(a_tree,b_tree,k):
 def N_k(a_tree,k):
     #the k nearest neighbors of a_tree
     #again the paper specifies a as input but here as well:
-    #a == a_tree.prediction
+    #a == a_tree.prediction_sample
     
     """
     It is important to specify that N_k is not equal to k 
@@ -80,8 +80,8 @@ def create_treesPredictions(RF,x_test,y_test):
     #creates the treesPredictions vector as described as pseudocode in the paper
     treesPredictions={}
     for a_tree in RF:
-        a_tree.prediction = a_tree.predict(x_test) #described as C(Tree(c_i),T) in the paper
-        #input(type(a_tree.prediction))
+        a_tree.prediction_sample = a_tree.predict(x_test) #described as C(Tree(c_i),T) in the paper
+        #input(type(a_tree.prediction_sample))
         treesPredictions[a_tree]=a_tree.predict(x_test)
     return treesPredictions
 
