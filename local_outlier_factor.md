@@ -8,7 +8,7 @@ Ein Punkt mit einer deutlich geringeren Dichte als seine Nachbarn ist hingegen e
 
 ## k-distance(A)
 
-Die k-distance(A) ist die maximale Distanz des Objektes __A__ zu seinem k nächsten Nachbarn.
+Die k-distance(A) ist die Distanz des Objektes __A__ zu seinem k nächsten Nachbarn.
 <img src="kdistance.png" width="500">\
 Diese Menge kann gegebenenfalls mehr als k Objekte enthalten,
 wenn es mehrere Objekte mit dem gleichen Abstand gibt.
