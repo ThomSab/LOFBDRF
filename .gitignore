@@ -127,3 +127,16 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+#custom
+*png
+*tif
+samir_top_ten_load.py
+performance_samir.json
+performance_nonzeros_nontraining.json
+performance_nonzeros.json
+performance.json
+check_results.py
+accuracy.py
+experiment_results_jasper.json
+todo.txt

@@ -21,7 +21,7 @@ def RF_assign_dist(RF):
     #calculates all distances between all vectors
     #and assigns the distances attribute to all trees 
     #st tree.distances is a dictionary with tree.distances[b_tree] gives the distance to b_tree
-    print("Calculating distances...")
+    #print("Calculating distances...")
     assert hasattr(RF.estimators_[0],"prediction"), "Random Tree has not been trained yet or the random Trees have not yet been assigned a prediction attribute."
     for a_tree in RF.estimators_:
         a_tree.distances = {b_tree: np.linalg.norm(a_tree.prediction_sample - b_tree.prediction_sample) for b_tree in RF.estimators_}
@@ -34,7 +34,7 @@ def k_dist(a_tree,k):
     return distances[k] #very intuitive
 
 def RF_assign_k_dist(RF,k):
-    print("Calculating k_distances...")
+    #print("Calculating k_distances...")
     for a_tree in RF.estimators_:
         a_tree.k_dist = k_dist(a_tree,k)
 
@@ -58,7 +58,7 @@ def N_k(a_tree,k):
 
 def RF_assign_N_k(RF,k):
     #assigns the set of N_k nearest neighbours to each tree
-    print("Calculating N_k nearest neighbours...")
+    #print("Calculating N_k nearest neighbours...")
     for a_tree in RF.estimators_:
         a_tree.N_k = N_k(a_tree,k)
 
@@ -68,7 +68,7 @@ def lrd_k(a_tree,k):
 
 def RF_assign_lrd_k(RF,k):
     #assigns a local reachablility density to each tree in the random forest
-    print("Calculating local reachablility densities...")
+    #print("Calculating local reachablility densities...")
     for a_tree in RF.estimators_:
         a_tree.lrd_k = lrd_k(a_tree,k)
 
@@ -88,20 +88,19 @@ def create_treesPredictions(RF,x_test,y_test):
 def LOFs_from_treesPredictions(treesPredictions,k):
     #assigns an LOF to every tree in the ensemble 
     #and returns it as a dictionary
-    print("Calculating LOFs...")
+    #print("Calculating LOFs...")
     return {a_tree:LOF_k(a_tree,k) for a_tree,prediction in treesPredictions.items()}
 
 def sigmoid(x):
     return (1 / (1 + np.exp(-x)))
+
 
 def normalize_LOF_dict(LOF_dict):
     #normalizes all the values in the LOF dict
     #st that they represent the probablility of each tree beeing an outlier
     #the paper is referencing a source but does not specify the method of normalization
     
-    #raise NotImplementedError
-    
-    return {tree: sigmoid(LOF) for tree,LOF in LOF_dict.items()} #for the time beeing ill just use a regular sigmoidal function
+    return {tree: LOF/sum(LOF_dict.values()) for tree,LOF in LOF_dict.items()} #for the time beeing ill just use a regular sigmoidal function
 
 def tree_weight(tree,tree_LOF):
     #calculates the weight of the tree according to the paper
@@ -124,7 +123,7 @@ def LOFs_and_score_to_weights(normalized_LOF_dict):
 
 #@cache 
 def assemble_LOFs(RF,k,x_test,y_test):
-    print("assembling LOFs...")
+    #print("assembling LOFs...")
     treesPredictions = create_treesPredictions(RF,x_test,y_test)
     RF_assign_dist(RF)
     RF_assign_k_dist(RF,k)
@@ -135,7 +134,7 @@ def assemble_LOFs(RF,k,x_test,y_test):
     return LOFs
 
 def assemble_weigths(LOFs,x_test,y_test):
-    print("assembling weights...")
+    #print("assembling weights...")
     normalized_LOF_dict = normalize_LOF_dict(LOFs)
     weights = weights_from_LOFs(normalized_LOF_dict,x_test,y_test)
     return weights
@@ -172,8 +171,8 @@ if __name__ == "__main__":
     RF.fit(x_train,y_train) #train the forest on the data
     
     avg_tree_acc,ensemble_acc = RF_accuracies(RF,x_test,y_test)
-    print(f"{avg_tree_acc} average accuracy over all trees")
-    print(f"{ensemble_acc} ensemble accuracy")
+    #print(f"{avg_tree_acc} average accuracy over all trees")
+    #print(f"{ensemble_acc} ensemble accuracy")
 
     for tree in RF:
         calculate_score(tree,x_test,y_test)
@@ -185,8 +184,8 @@ if __name__ == "__main__":
         LOFs,weights = assemble_LOFB_DRF(temp_RF,k,x_test,y_test=None)
         
         avg_tree_acc,ensemble_acc = RF_accuracies(temp_RF,x_test,y_test)
-        print(f"{avg_tree_acc} average accuracy over all trees")
-        print(f"{ensemble_acc} ensemble accuracy")
+        #print(f"{avg_tree_acc} average accuracy over all trees")
+        #print(f"{ensemble_acc} ensemble accuracy")
 
         #visualize.tree_to_png(RF.estimators_[25],"tree")
     

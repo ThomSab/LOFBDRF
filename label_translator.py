@@ -63,48 +63,38 @@ def cut_training_region_from_lm(label_map):
     image_to_rescale = Image.fromarray(map_training_region.astype(np.uint8))
     image_rescaled = image_to_rescale.resize((4768,1202),Image.NEAREST)
     return image_rescaled
-
     
     return training_region
+
+def save_map(label_map,directory,file_name):
+    print(f"saving {directory} // {file_name}...")
+    label_map.save(fr"C:\Users\jasper\Documents\HTCV_local\Label_Maps_Grey\{directory}\{file_name}" ,compression='raw')
+    
 
 if __name__ == "__main__":
         
     label_folder_path = r"C:\Users\jasper\Documents\HTCV_local\Label_Maps"
-
-    ground_truth = cv2.imread(r"C:\Users\jasper\Documents\HTCV_local\2018IEEE_Contest\Phase2\TrainingGT\2018_IEEE_GRSS_DFC_GT_TR.tif",0)
-    trainSamples = cv2.imread(r"C:\Users\jasper\Documents\HTCV_local\trainSamples.png",0)
-    trainSamples_relevant = np.array(cut_training_region_from_lm(trainSamples))    
-
-
+    
+    
     label_image_paths = [
         [f"{label_folder_path}\\{directory}\\{file}"
             for file in os.listdir(label_folder_path+"\\"+directory)] 
                 for directory in os.listdir(label_folder_path)]
-                    #if "-med" not in directory and "-uni" not in directory] -med and -uni are valid labelmaps
-
-    performance_dict = {_:0 for hyperfolder in label_image_paths for _ in hyperfolder}
+    
     flat_label_image_paths = [_ for hyperfolder in label_image_paths for _ in hyperfolder]
-
     rgb_images = [cv2.imread(image) for directory in label_image_paths for image in directory ]
-    """
-    for label_image in rgb_images:
-        classification_image = rgb_prediction_to_classification(label_image)
+
+    for idx,full_file_name in enumerate(flat_label_image_paths):
+
+        rgb_classification = rgb_prediction_to_classification(rgb_images[idx])
+        directory,file_name = full_file_name.split("\\")[-2],full_file_name.split("\\")[-1]
+        try:
+            os.mkdir(fr"C:\Users\jasper\Documents\HTCV_local\Label_Maps_Grey\{directory}")
+        except FileExistsError:
+            print("Directory Exists.")
+
+        classification_image = Image.fromarray(rgb_classification.astype(np.uint8))
+        test_image = Image.fromarray(np.array([_*255/20 for _ in rgb_classification]).astype(np.uint8))
+        save_map(test_image,directory,"visible_"+file_name.replace(".png",".tif"))
+        save_map(classification_image,directory,file_name.replace(".png",".tif"))
         
-        out_img = Image.fromarray(label_image.astype(np.uint8))
-    """
-    for _ in range(len(rgb_images)):
-        label_map = rgb_images[_]
-        #test_img = rgb_prediction_to_classification(test_img)
-        img_training_region = np.array(cut_training_region_from_lm(label_map))
-        img_training_region = rgb_prediction_to_classification(img_training_region)
-        
-        
-        
-        performance_dict[flat_label_image_paths[_]] = str(perfomance(img_training_region,ground_truth,trainSamples_relevant))
-        print(flat_label_image_paths[_])
-        print(check_classes(img_training_region))
-        print(performance_dict[flat_label_image_paths[_]])
-    
-    
-    with open(r"C:\Users\jasper\Documents\HTCV\LOFBDRF\performance_nonzeros_nontraining.json", "w+") as out_file:
-        json.dump(performance_dict, out_file) 

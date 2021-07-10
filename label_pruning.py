@@ -6,6 +6,7 @@ from PIL import Image
 import json
 import random
 from copy import deepcopy
+import re
 
 import LOFB_DRF as lof
 
@@ -44,31 +45,28 @@ class MockTree:
         self.prediction = None
         self.prediction_sample = None
 
-def mock_create_treesPredictions(RF,rgb_prediction_vectors):
-    for idx,a_tree in enumerate(RF.estimators_):
-        a_tree.prediction = rgb_prediction_vectors[idx] 
+class PruningInformation:
+    def __init__(self):
+        self.k = 0
+        self.sample_size = 0
+        self.run = 0
+        self.base_mockforest =None
+        
 
-def mock_create_prediction_samples(RF,prediction_samples):
-    for idx,a_tree in enumerate(RF.estimators_):
-        a_tree.prediction_sample = prediction_samples[idx] 
+def mock_create_treesPredictions(RF,classification_vector_dict):
+    for a_tree in RF.estimators_:
+        a_tree.prediction = classification_vector_dict[a_tree.name] 
 
-def rgb_prediction_to_classification(rgb_prediction):
-    rgb_prediction_tuples = list(map(tuple,rgb_prediction))
-    return np.array(list(map(color_dict.get,rgb_prediction_tuples))) 
+def mock_create_prediction_samples(RF,sample_idx_list):
+    print("\t\tcreating sample classifications...")
+    assert RF.estimators_[0].prediction[0] in range(21), f"tree prediction has not been transformed from rgb to classification: {RF.estimators_[0].prediction[0]}"
+    for a_tree in RF.estimators_:
+        a_tree.prediction_sample = np.array([ a_tree.prediction[idx] for idx in sample_idx_list])
 
-def mock_create_classifications(RF):
-    for idx,a_tree in enumerate(RF.estimators_):
-        print(f"Creating classification of tree {a_tree.name}")
-        a_tree.prediction = rgb_prediction_to_classification(a_tree.prediction)
-
-def mock_create_sample_classifications(RF):
-    for idx,a_tree in enumerate(RF.estimators_):
-        print(f"Creating classification of tree {a_tree.name}")
-        a_tree.prediction_sample = rgb_prediction_to_classification(a_tree.prediction_sample)
 
         
 def mock_majority_vote(mockforest):
-    print("Voting...")
+    print("\t\tVoting...")
     ensemble_array=np.array([estimator.prediction for estimator in mockforest.estimators_])
     return np.array([majority_classification(pixel) for pixel in ensemble_array.T])
     
@@ -100,74 +98,113 @@ def img_to_classes_list(estimator_img):
     arr = np.array(estimator_img)
     class_set = set([ _ for col in arr for _ in col])
     return list(class_set)
-    
-    
 
+def generate_test_forest(pruning_information):
+    sample_idx_list = np.random.choice(range(len(base_mockforest.estimators_[0].prediction)),pruning_information.sample_size,replace=False)
+    mockforest = deepcopy(pruning_information.base_mockforest)
     
+    mock_create_prediction_samples(mockforest,sample_idx_list) 
+
+    mockforest.estimators_.sort(key= lambda x:x.score_attr,reverse=True)
+    
+    return mockforest
+
+def calculate_lofs(mockforest,k):
+    print("\t\tcalculating lofs")
+    tree_predictions_dict = {tree:tree.prediction for tree in mockforest.estimators_}
+    lof.RF_assign_dist(mockforest)
+    lof.RF_assign_k_dist(mockforest,k)
+    lof.RF_assign_N_k(mockforest,k)
+    lof.RF_assign_lrd_k(mockforest,k)
+    return lof.LOFs_from_treesPredictions(tree_predictions_dict,k)
+    
+def prune(pruning_information, print_leftovers = False):
+    mockforest = generate_test_forest(pruning_information)
+    
+    LOFs = calculate_lofs(mockforest,pruning_information.k)
+    weights = lof.LOFs_and_score_to_weights(LOFs)
+
+    mockforest.estimators_ = [tree for tree,weight in sorted(weights.items(), key=lambda item:item[1], reverse=True)][:pruning_information.k]
+
+    print("\t\tForest pruned")
+
+    if print_leftovers:
+        for estimator in mockforest.estimators_:
+            print(f"\t\t{estimator.name}")
+            
+    return mockforest
+
+                
+
+def save(majority_vote,pruning_information):
+    print("\t\tsaving...")
+    best_estimator = majority_vote
+    estimator_img = estimator_to_upload_image(best_estimator)
+    estimator_img.save(fr"C:\Users\jasper\Documents\HTCV_local\estimator_s{pruning_information.sample_size}_k{pruning_information.k}_run{pruning_information.run}.tif" ,compression='raw')
+
+    best_estimator_visible = np.array([_*255/20 for _ in best_estimator])
+    estimator_img_visible = estimator_to_upload_image(best_estimator_visible)
+    estimator_img_visible.save(fr"C:\Users\jasper\Documents\HTCV_local\estimator_visible_s{pruning_information.sample_size}_k{pruning_information.k}_run{pruning_information.run}.tif" ,compression='raw')
+
+    print("\t\tsaved output images to drive")
+    #print(img_to_classes_list(estimator_img_visible))
+    
+def prune_and_save(pruning_information):
+    pruned_mockforest = prune(pruning_information)
+    majority_vote = mock_majority_vote(pruned_mockforest)
+    save(majority_vote,pruning_information)
+
+def run_experiment(k_list,sample_list,run_list):
+    for k in k_list:#[5, 28, 56, 84, 112, 140]:
+        assert k>0, f"k must be bigger than zero! Is {k}"
+        print(f"k is {k}")
+        for sample_size in sample_list:#[100,10000,100000]:
+            print(f"\tsample size is {sample_size}")
+            for run in run_list:
+                pruning_information.k = k
+                pruning_information.sample_size = sample_size
+                pruning_information.run = run
+                print(f"\t\tgoing through run {run}")
+                prune_and_save(pruning_information)
+                
+
 if __name__ == "__main__":
         
     sample_idx_list=None
+
+    label_folder_path = r"C:\Users\jasper\Documents\HTCV_local\Label_Maps_Grey"
     
-    
-    label_folder_path = r"C:\Users\jasper\Documents\HTCV_local\Label_Maps"
-    
-    with open(r"C:\Users\jasper\Documents\HTCV\LOFBDRF\performance.json") as score_file:
+    with open(r"C:\Users\jasper\Documents\LOFBDRF\performance_samir.json") as score_file:
         score_dict = json.load(score_file)
+
+    top_10_folders = ["rgb-h15-s10000-t10",
+                      "rgb-h30-s10000-t10",
+                      "rgb-h30-s10000-t10-med",
+                      "rgb-h30-s10000-t10-uni",
+                      "hsi-h15-s10000-t10",
+                      "rgb-h5-s10000-t10",
+                      "hsi-h30-s10000-t10",
+                      "rgb-h5-s100-t10",
+                      "hsi-h30-s10000-t10",
+                      "rgb-h30-s100-t10"]
+                      
+    top_1_folder = ["rgb-h15-s10000-t10"]
+
+    classification_image_dict =   {directory+"-tree"+image.split('tree-')[-1][0] : cv2.imread(label_folder_path+"\\"+directory+"\\"+image, cv2.IMREAD_GRAYSCALE)
+                        for directory in os.listdir(label_folder_path) 
+                            for image in os.listdir(label_folder_path+"\\"+directory)
+                                if "visible" not in image and directory in top_1_folder}
+
     
-    label_image_paths = [
-        [f"{label_folder_path}\\{directory}\\{file}"
-            for file in os.listdir(label_folder_path+"\\"+directory)] 
-                for directory in os.listdir(label_folder_path)]
-                    #if "-med" not in directory and "-uni" not in directory]
-    image_names = [image for directory in label_image_paths for image in directory ]
-
-                    
-    rgb_image_dict = {image : cv2.imread(image) for image in image_names}
-    rgb_vector_images = [img.reshape(-1,3) for img in rgb_image_dict.values()]
-
-    base_mockforest=MockForest(image_names) #original Tree to be copied
-    mock_create_treesPredictions(base_mockforest,rgb_vector_images)
-    for tree in mockforest.estimators_:
-            tree.score_attr = np.float(score_dict[tree.name])
-    mock_create_classifications(base_mockforest)#this takes a while
-
     
-    for k in [5,9,10,15,20,25,30,35,40,45,50,50,70,90,10,120,140]:
-        for sample_size in [100,10000,100000]:
-            for run in range(3):
-                sample_idx_list = np.random.choice(range(len(rgb_vector_images[0])),sample_size,replace=False)
-                rgb_vector_image_samples = [extract_sample_from_vector(vector_image,sample_idx_list) for vector_image in rgb_vector_images]
+    classifiation_vector_dict = {tree_name:classification.reshape(-1) for tree_name,classification in classification_image_dict.items()}
 
-                mockforest = deepcopy(base_mockforest)
-                
-                mock_create_prediction_samples(mockforest,rgb_vector_image_samples) 
+    base_mockforest=MockForest(classification_image_dict.keys()) #original Tree to be copied
+    mock_create_treesPredictions(base_mockforest,classifiation_vector_dict)
+    for tree in base_mockforest.estimators_:
+        tree.score_attr = np.float(score_dict[tree.name])
 
-                mockforest.estimators_.sort(key= lambda x:x.score_attr,reverse=True)
-                mock_create_sample_classifications(mockforest)
-
-                tree_predictions_dict = {tree:tree.prediction for tree in mockforest.estimators_}
-                
-                lof.RF_assign_dist(mockforest)
-                lof.RF_assign_k_dist(mockforest,k)
-                lof.RF_assign_N_k(mockforest,k)
-                lof.RF_assign_lrd_k(mockforest,k)
-
-                LOFs = lof.LOFs_from_treesPredictions(tree_predictions_dict,k)
-                weights = lof.LOFs_and_score_to_weights(LOFs)
-
-                mockforest.estimators_ = [tree for tree,weight in sorted(weights.items(), key=lambda item:item[1], reverse=True)][:k]
-
-                print("Forest pruned")
-
-                majority_vote= mock_majority_vote(mockforest)
-                
-                best_estimator = majority_vote
-                estimator_img = estimator_to_upload_image(best_estimator)
-                estimator_img.save(fr"C:\Users\jasper\Documents\HTCV_local\estimator_s{sample_size}_k{k}_run{run}.tif" ,compression='raw')
-
-                best_estimator_visible = np.array([_*255/20 for _ in best_estimator])
-                estimator_img_visible = estimator_to_upload_image(best_estimator_visible)
-                estimator_img_visible.save(fr"C:\Users\jasper\Documents\HTCV_local\estimator_visible_s{sample_size}_k{k}_run{run}.tif" ,compression='raw')
-                
-                print(img_to_classes_list(estimator_img_visible))
-
+    pruning_information = PruningInformation()
+    pruning_information.base_mockforest = base_mockforest
+    
+    run_experiment([1],[10000],range(3))
