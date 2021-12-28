@@ -6,7 +6,6 @@ from PIL import Image
 import json
 import random
 from copy import deepcopy
-import re
 
 import LOFB_DRF as lof
 
@@ -32,6 +31,20 @@ color_dict = {(  0, 208,   0) :1,
               (193,   0, 193) :18,
               (244,   0,   0) :19,
               (223, 199, 180) :20}
+              
+platt_c_dict = { ( 255, 255, 255 ):0,   #No labels 
+                 ( 255, 0,   0   ):1,   #urban   
+                 ( 0,   128, 0   ):2,   #forest   
+                 ( 255, 0,   255 ):3,   #road    
+                 ( 255, 255, 0   ):4,   #field    
+                 ( 0,   0,   255 ):5 }  #water    
+
+opr_c_dict = {(0,   0,   0  ):0,   #No labels 
+              (255, 0,   0  ):1,   #urban     
+              (0,   128, 0  ):2,   #forest    
+              (0,   0,   255):3,   #road      
+              (255, 255, 0  ):4,   #field     
+              (0,   255, 0  ):5 }  #grassland 
 
 class MockForest:
     def __init__(self,tree_names):
@@ -193,7 +206,7 @@ if __name__ == "__main__":
     classification_image_dict =   {directory+"-tree"+image.split('tree-')[-1][0] : cv2.imread(label_folder_path+"\\"+directory+"\\"+image, cv2.IMREAD_GRAYSCALE)
                         for directory in os.listdir(label_folder_path) 
                             for image in os.listdir(label_folder_path+"\\"+directory)
-                                if "visible" not in image and directory in top_1_folder}
+                                if "visible" not in image} #and directory in top_1_folder}
 
     
     
@@ -207,4 +220,4 @@ if __name__ == "__main__":
     pruning_information = PruningInformation()
     pruning_information.base_mockforest = base_mockforest
     
-    run_experiment([1],[10000],range(3))
+    run_experiment([36],[10000],range(3))

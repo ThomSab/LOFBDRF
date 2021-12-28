@@ -6,7 +6,7 @@ import json
 from PIL import Image
 
 #as defined in the drss ieee competition:
-color_dict = {(  0, 208,   0) :1,
+old_color_dict = {(  0, 208,   0) :1,
               (  0, 255, 123) :2,
               ( 96, 156,  49) :3,
               (  0, 143,   0) :4,
@@ -27,6 +27,28 @@ color_dict = {(  0, 208,   0) :1,
               (244,   0,   0) :19,
               (223, 199, 180) :20}
 
+
+platt_c_dict = { ( 255, 255, 255 ):0,   #No labels 
+                 ( 0  , 0,   255 ):1,   #urban   
+                 ( 0,   128, 0   ):2,   #forest   
+                 ( 255, 0,   255 ):3,   #road    
+                 ( 0  , 255, 255 ):4,   #field    
+                 ( 255,   0, 0   ):5 }  #water    
+
+oph_c_dict = {(0,   0,   0  ):0,   #No labels 
+              (0, 0,   255  ):1,   #urban     
+              (0,   128, 0  ):2,   #forest    
+              (255,   0, 0  ):3,   #road      
+              (0, 255, 255  ):4,   #field     
+              (0,   255, 0  ):5 }  #grassland 
+              
+              #(0, 255, 255),
+              #(0, 255, 0  ),
+              #(0, 128, 0  ),
+              #(255, 0, 0  ),
+              #(0,   0, 255)
+
+color_dict = platt_c_dict
 
 def rgb_prediction_to_classification(rgb_prediction):
     if rgb_prediction.ndim==3:
@@ -66,35 +88,48 @@ def cut_training_region_from_lm(label_map):
     
     return training_region
 
-def save_map(label_map,directory,file_name):
+def save_map(label_map,directory,file_name,location):
     print(f"saving {directory} // {file_name}...")
-    label_map.save(fr"C:\Users\jasper\Documents\HTCV_local\Label_Maps_Grey\{directory}\{file_name}" ,compression='raw')
+    label_map.save(fr"C:\Users\jasper\Documents\HTCV_local\{location}_Label_Maps_Grey\{directory}\{file_name}" ,compression='raw')
     
 
 if __name__ == "__main__":
         
-    label_folder_path = r"C:\Users\jasper\Documents\HTCV_local\Label_Maps"
+    #label_folder_path = r"C:\Users\jasper\Documents\HTCV_local\Label_Maps"
+    #old labelmaps were in label maps but now its oph and platt
+    
+    label_folder_path = r"C:\Users\jasper\Documents\HTCV_local"
+    
+    location = "platt" # "platt"
+    
+    label_folder_path=label_folder_path+"\\"+location 
     
     
-    label_image_paths = [
-        [f"{label_folder_path}\\{directory}\\{file}"
-            for file in os.listdir(label_folder_path+"\\"+directory)] 
-                for directory in os.listdir(label_folder_path)]
+    for memory_idx in range(len(os.listdir(label_folder_path))-1):
     
-    flat_label_image_paths = [_ for hyperfolder in label_image_paths for _ in hyperfolder]
-    rgb_images = [cv2.imread(image) for directory in label_image_paths for image in directory ]
+    
+        label_image_paths = [
+            [f"{label_folder_path}\\{directory}\\{file}"
+                for file in os.listdir(label_folder_path+"\\"+directory)
+                    if "Samples" not in file]
+                    for directory in os.listdir(label_folder_path)[memory_idx:memory_idx+1]
+                        if directory not in ["label_inter.png","reference.png"]]
+        
+        flat_label_image_paths = [_ for hyperfolder in label_image_paths for _ in hyperfolder]
+        rgb_images = [cv2.imread(image) for directory in label_image_paths for image in directory ]
 
-    for idx,full_file_name in enumerate(flat_label_image_paths):
+        for idx,full_file_name in enumerate(flat_label_image_paths):
 
-        rgb_classification = rgb_prediction_to_classification(rgb_images[idx])
-        directory,file_name = full_file_name.split("\\")[-2],full_file_name.split("\\")[-1]
-        try:
-            os.mkdir(fr"C:\Users\jasper\Documents\HTCV_local\Label_Maps_Grey\{directory}")
-        except FileExistsError:
-            print("Directory Exists.")
+            print(full_file_name)
+            rgb_classification = rgb_prediction_to_classification(rgb_images[idx])
+            directory,file_name = full_file_name.split("\\")[-2],full_file_name.split("\\")[-1]
+            try:
+                os.mkdir(fr"C:\Users\jasper\Documents\HTCV_local\{location}_Label_Maps_Grey\{directory}")
+            except FileExistsError:
+                print("Directory Exists.")
 
-        classification_image = Image.fromarray(rgb_classification.astype(np.uint8))
-        test_image = Image.fromarray(np.array([_*255/20 for _ in rgb_classification]).astype(np.uint8))
-        save_map(test_image,directory,"visible_"+file_name.replace(".png",".tif"))
-        save_map(classification_image,directory,file_name.replace(".png",".tif"))
+            classification_image = Image.fromarray(rgb_classification.astype(np.uint8))
+            test_image = Image.fromarray(np.array([_*255/len(color_dict) for _ in rgb_classification]).astype(np.uint8))
+            save_map(test_image,directory,"visible_"+file_name.replace(".png",".tif"),location)
+            save_map(classification_image,directory,file_name.replace(".png",".tif"),location)
         
