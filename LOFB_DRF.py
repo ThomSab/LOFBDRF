@@ -29,9 +29,10 @@ def RF_assign_dist(RF):
 def k_dist(a_tree,k):
     #the k-distance of a, in this case a is the prediction made by a random tree over the test data
     #so in this case the paper specifies the prediction vector a as the input of the k-distance function
-    #but it really doesnt make a difference bc a == a_tree.If so, don't I require a ground truth to determine the quality each trees output?
+    #but it really doesnt make a difference bc a == a_tree. 
+    #A ground truth to determine the quality each trees output is required.
     distances  = [distance for b_tree,distance in sorted(a_tree.distances.items(), key=lambda item:item[1])]
-    return distances[k] #very intuitive
+    return distances[k-1] #minus one because index starts at zero but k does not
 
 def RF_assign_k_dist(RF,k):
     #print("Calculating k_distances...")

@@ -48,7 +48,7 @@ oph_c_dict = {(0,   0,   0  ):0,   #No labels
               #(255, 0, 0  ),
               #(0,   0, 255)
 
-color_dict = platt_c_dict
+color_dict = oph_c_dict
 
 def rgb_prediction_to_classification(rgb_prediction):
     if rgb_prediction.ndim==3:
@@ -100,14 +100,14 @@ if __name__ == "__main__":
     
     label_folder_path = r"C:\Users\jasper\Documents\HTCV_local"
     
-    location = "platt" # "platt"
+    location = "oph" # "platt"
     
     label_folder_path=label_folder_path+"\\"+location 
     
     
     for memory_idx in range(len(os.listdir(label_folder_path))-1):
     
-    
+        
         label_image_paths = [
             [f"{label_folder_path}\\{directory}\\{file}"
                 for file in os.listdir(label_folder_path+"\\"+directory)
@@ -115,21 +115,49 @@ if __name__ == "__main__":
                     for directory in os.listdir(label_folder_path)[memory_idx:memory_idx+1]
                         if directory not in ["label_inter.png","reference.png"]]
         
+
+        """
+        The bit below redefines the target paths so that instead of the labelmaps by the RFs 
+        the true labels are translated instead.
+        ___________________________________________________________________________________________
+        """
+        reference_image_paths=[ [r"C:\Users\jasper\Documents\HTCV_local\oph\label_inter.png"],
+                                [r"C:\Users\jasper\Documents\HTCV_local\platt\reference.png"] ]
+        
+        label_image_paths = reference_image_paths
+        
+        """
+        ___________________________________________________________________________________________
+        End of bit
+        """
+        
         flat_label_image_paths = [_ for hyperfolder in label_image_paths for _ in hyperfolder]
         rgb_images = [cv2.imread(image) for directory in label_image_paths for image in directory ]
 
         for idx,full_file_name in enumerate(flat_label_image_paths):
-
-            print(full_file_name)
-            rgb_classification = rgb_prediction_to_classification(rgb_images[idx])
+            
+            
             directory,file_name = full_file_name.split("\\")[-2],full_file_name.split("\\")[-1]
-            try:
-                os.mkdir(fr"C:\Users\jasper\Documents\HTCV_local\{location}_Label_Maps_Grey\{directory}")
-            except FileExistsError:
-                print("Directory Exists.")
+            target_file_path = fr"C:\Users\jasper\Documents\HTCV_local\{location}_Label_Maps_Grey\{directory}\{file_name.replace('.png','.tif')}"
 
-            classification_image = Image.fromarray(rgb_classification.astype(np.uint8))
-            test_image = Image.fromarray(np.array([_*255/len(color_dict) for _ in rgb_classification]).astype(np.uint8))
-            save_map(test_image,directory,"visible_"+file_name.replace(".png",".tif"),location)
-            save_map(classification_image,directory,file_name.replace(".png",".tif"),location)
-        
+            
+            
+            if not os.path.exists(target_file_path):
+                print(f"translating {target_file_path}")
+
+
+                rgb_classification = rgb_prediction_to_classification(rgb_images[idx])
+
+
+                try:
+                    os.mkdir(fr"C:\Users\jasper\Documents\HTCV_local\{location}_Label_Maps_Grey\{directory}")
+                except FileExistsError:
+                    print("Directory Exists.")
+
+                classification_image = Image.fromarray(rgb_classification.astype(np.uint8))
+                test_image = Image.fromarray(np.array([_*255/len(color_dict) for _ in rgb_classification]).astype(np.uint8))
+                save_map(test_image,directory,"visible_"+file_name.replace(".png",".tif"),location)
+                save_map(classification_image,directory,file_name.replace(".png",".tif"),location)
+            else:
+                print(f"{target_file_path} already exists")
+            

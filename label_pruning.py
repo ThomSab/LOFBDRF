@@ -7,6 +7,7 @@ import json
 import random
 from copy import deepcopy
 
+
 import LOFB_DRF as lof
 
 
@@ -94,17 +95,22 @@ def majority_classification(vector):
     return np.bincount(vector).argmax()
 
 def estimator_to_upload_image(estimator):
-    estimator = np.reshape(estimator,(1202,4172))
-    out_img = Image.fromarray(estimator.astype(np.uint8))
-    out_img = out_img.resize((8344,2404),Image.NEAREST)
     """
     a prime example of why array coordinates and image coordinates dont mix well
     Because arrays are ordered by vectors and then rows, values are accessed by y and then x
     with images its the opposite so x and then y
     so the array has to reshaped as (y,x)
     then transformed to image
-    and then resized as (x,y)
     """
+    if estimator.shape == (9229600,): #for oph
+        estimator = np.reshape(estimator,(6640,1390))
+        out_img = Image.fromarray(estimator.astype(np.uint8))
+        #out_img = out_img.resize((x,y),Image.NEAREST) --> used to be necessary
+
+    if estimator.shape == (120629776,):
+        estimator = np.reshape(estimator,(11698,10312))
+        out_img = Image.fromarray(estimator.astype(np.uint8))
+        
     return out_img
 
 def img_to_classes_list(estimator_img):
@@ -153,11 +159,11 @@ def save(majority_vote,pruning_information):
     print("\t\tsaving...")
     best_estimator = majority_vote
     estimator_img = estimator_to_upload_image(best_estimator)
-    estimator_img.save(fr"C:\Users\jasper\Documents\HTCV_local\estimator_s{pruning_information.sample_size}_k{pruning_information.k}_run{pruning_information.run}.tif" ,compression='raw')
+    estimator_img.save(fr"C:\Users\jasper\Documents\HTCV_local\{location}_pruned\{location}_estimator_s{pruning_information.sample_size}_k{pruning_information.k}_run{pruning_information.run}.tif" ,compression='raw')
 
     best_estimator_visible = np.array([_*255/20 for _ in best_estimator])
     estimator_img_visible = estimator_to_upload_image(best_estimator_visible)
-    estimator_img_visible.save(fr"C:\Users\jasper\Documents\HTCV_local\estimator_visible_s{pruning_information.sample_size}_k{pruning_information.k}_run{pruning_information.run}.tif" ,compression='raw')
+    estimator_img_visible.save(fr"C:\Users\jasper\Documents\HTCV_local\{location}_pruned\{location}_estimator_visible_s{pruning_information.sample_size}_k{pruning_information.k}_run{pruning_information.run}.tif" ,compression='raw')
 
     print("\t\tsaved output images to drive")
     #print(img_to_classes_list(estimator_img_visible))
@@ -166,6 +172,12 @@ def prune_and_save(pruning_information):
     pruned_mockforest = prune(pruning_information)
     majority_vote = mock_majority_vote(pruned_mockforest)
     save(majority_vote,pruning_information)
+    
+    save_path=fr"C:\Users\jasper\Documents\HTCV_local\{location}_pruned"
+    with open(save_path + f'\\k{pruning_information.k}_s{pruning_information.sample_size}_r{pruning_information.run}.json', 'w') as f:
+        forest_members = [tree.name for tree in pruned_mockforest.estimators_]
+        json.dump(forest_members, f)
+
 
 def run_experiment(k_list,sample_list,run_list):
     for k in k_list:#[5, 28, 56, 84, 112, 140]:
@@ -180,14 +192,17 @@ def run_experiment(k_list,sample_list,run_list):
                 print(f"\t\tgoing through run {run}")
                 prune_and_save(pruning_information)
                 
+                
 
 if __name__ == "__main__":
         
     sample_idx_list=None
-
-    label_folder_path = r"C:\Users\jasper\Documents\HTCV_local\Label_Maps_Grey"
     
-    with open(r"C:\Users\jasper\Documents\LOFBDRF\performance_samir.json") as score_file:
+    location="oph"
+    label_folder_path = fr"C:\Users\jasper\Documents\HTCV_local\{location}_Label_Maps_Grey"
+    
+    #old path r"C:\Users\jasper\Documents\LOFBDRF\performance_samir.json"
+    with open(fr"C:\Users\jasper\Documents\HTCV_local\accs\{location}_acc.json") as score_file:
         score_dict = json.load(score_file)
 
     top_10_folders = ["rgb-h15-s10000-t10",
@@ -206,7 +221,7 @@ if __name__ == "__main__":
     classification_image_dict =   {directory+"-tree"+image.split('tree-')[-1][0] : cv2.imread(label_folder_path+"\\"+directory+"\\"+image, cv2.IMREAD_GRAYSCALE)
                         for directory in os.listdir(label_folder_path) 
                             for image in os.listdir(label_folder_path+"\\"+directory)
-                                if "visible" not in image} #and directory in top_1_folder}
+                                if "visible" not in image and "_est-0" not in image }
 
     
     
@@ -214,10 +229,13 @@ if __name__ == "__main__":
 
     base_mockforest=MockForest(classification_image_dict.keys()) #original Tree to be copied
     mock_create_treesPredictions(base_mockforest,classifiation_vector_dict)
+    
     for tree in base_mockforest.estimators_:
         tree.score_attr = np.float(score_dict[tree.name])
-
+        
+    
     pruning_information = PruningInformation()
     pruning_information.base_mockforest = base_mockforest
     
-    run_experiment([36],[10000],range(3))
+    run_experiment(list(np.arange(28,71,1)),[100000],range(3))
+    #run_experiment([7],[100000],range(1))
